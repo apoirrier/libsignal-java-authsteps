@@ -53,11 +53,11 @@ public class SessionCipher {
 
   public static final Object SESSION_LOCK = new Object();
 
-  private final SessionStore          sessionStore;
+  protected final SessionStore          sessionStore;
   private final IdentityKeyStore      identityKeyStore;
   private final SessionBuilder        sessionBuilder;
   private final PreKeyStore           preKeyStore;
-  private final SignalProtocolAddress remoteAddress;
+  protected final SignalProtocolAddress remoteAddress;
 
   /**
    * Construct a SessionCipher for encrypt/decrypt operations on a session.
