@@ -10,6 +10,7 @@ import "LocalStorageProtocol.proto";
 message AuthSet {
     optional uint32                    step    = 1;
     repeated SessionStructure.Pair     skipped = 2;
-    optional SessionStructure.HashAuth hash    = 3;
-    optional bytes                     sign    = 4;
+    repeated SessionStructure.Pair     late    = 3;
+    optional SessionStructure.HashAuth hash    = 4;
+    optional bytes                     sign    = 5;
 }

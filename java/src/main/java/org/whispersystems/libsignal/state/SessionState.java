@@ -616,9 +616,12 @@ public class SessionState {
    * Saves a hash of the ciphertext in the dictionary ctxtHashes
    */
   public void storeCiphertext(SignalMessage ciphertext, int epochNumber) {
-    if(epochNumber < getLastAuth().first())
-      return; // We do not store hashes of older ciphertexts
     int msgNumber = ciphertext.getCounter();
+    if(epochNumber < getLastAuth().first() || (epochNumber == getLastAuth().first() && msgNumber < getLastAuth().second()))
+      this.sessionStructure = this.sessionStructure.toBuilder()
+                                                   .addLateMessages(SessionStructure.Pair.newBuilder()
+                                                                     .setI(epochNumber).setJ(msgNumber).build())
+                                                   .build();
     if(epochNumber >= sessionStructure.getCtxtHashesCount())
       this.sessionStructure = this.sessionStructure.toBuilder()
                                                   .addCtxtHashes(SessionStructure.Vector.newBuilder()
@@ -691,6 +694,36 @@ public class SessionState {
                                             .build();
   }
 
+  private int getOldestSession() {
+    if(sessionStructure.hasOldestSession())
+      return sessionStructure.getOldestSession();
+    return 0;
+  }
+
+  private void clearOldEpochs() {
+    List<Chain> receiverChains = sessionStructure.getReceiverChainsList();
+    List<Integer> ratchetHashes = new Vector<>(sessionStructure.getRatchetHashesList());
+    int oldestSessionAlive = ratchetHashes.size();
+
+    for(Chain receiverChain : receiverChains) {
+      try {
+        ECPublicKey chainSenderRatchetKey = Curve.decodePoint(receiverChain.getSenderRatchetKey().toByteArray(), 0);
+        int epoch = ratchetHashes.indexOf(chainSenderRatchetKey.hashCode());
+        if(epoch >= 0 && epoch < oldestSessionAlive)
+          oldestSessionAlive = epoch;
+      } catch(InvalidKeyException e) {
+        Log.w("SessionRecordV2", e);
+      }
+    }
+
+    for(int i=getOldestSession();i<oldestSessionAlive;++i)
+      this.sessionStructure = sessionStructure.toBuilder()
+                              .setCtxtHashes(i, SessionStructure.Vector.newBuilder().build())
+                              .setCurrentSkipped(i, SessionStructure.Vector.newBuilder().build())
+                              .build();
+    this.sessionStructure = sessionStructure.toBuilder().setOldestSession(oldestSessionAlive).build();
+  }
+
   public void startAuth() {
     if(isAuthenticating())
       return;
@@ -709,19 +742,23 @@ public class SessionState {
       return AuthSet.newBuilder().setStep(0).build();
     int step = sessionStructure.getStep();
     AuthSet authInfo = AuthSet.newBuilder().setStep(0).build();
-    List<SessionStructure.Pair> skipped;
+    List<SessionStructure.Pair> skipped, late;
     switch (step) {
       case 1:
-        skipped = sessionStructure.getOurSkippedList();
-        authInfo =  AuthSet.newBuilder().setStep(1)
+        skipped  = sessionStructure.getOurSkippedList();
+        late     = sessionStructure.getLateMessagesList();
+        authInfo = AuthSet.newBuilder().setStep(1)
                                         .addAllSkipped(skipped)
+                                        .addAllLate(late)
                                         .build();
         break;
 
       case 2:
         skipped = sessionStructure.getOurSkippedList();
+        late     = sessionStructure.getLateMessagesList();
         authInfo =  AuthSet.newBuilder().setStep(2)
                                         .addAllSkipped(skipped)
+                                        .addAllLate(late)
                                         .setHash(sessionStructure.getHashAuth())
                                         .build();
         break;
@@ -784,14 +821,14 @@ public class SessionState {
         if(!Curve.verifySignature(vfyKey.getPublicKey(), authInfo.toByteArray(), sig))
           throw new AuthStepSignatureException("Signature verification failure", vfyKey);
         fixSkipped();
-        updateHash(new Vector<>(authInfo.getSkippedList()));
+        updateHash(new Vector<>(authInfo.getSkippedList()), new Vector<>(authInfo.getLateList()));
         setStep(2);
       } else if(currentStep == 1 || currentStep == 2) {
         if(authInfoStep != currentStep + 1)
           throw new InvalidMessageException("Bad authentication step epoch");
         byte[] sig = authInfo.getSign().toByteArray();
         if(currentStep == 1)
-          updateHash(new Vector<>(authInfo.getSkippedList()));
+          updateHash(new Vector<>(authInfo.getSkippedList()), new Vector<>(authInfo.getLateList()));
         authInfo = authInfo.toBuilder()
                            .clearSign()
                            .setHash(sessionStructure.getHashAuth())
@@ -817,9 +854,21 @@ public class SessionState {
    *
    * @param theirSkipped The list of indexes of messages skipped by the other party.
    */
-  private void updateHash(Vector<SessionStructure.Pair> theirSkipped) {
+  private void updateHash(Vector<SessionStructure.Pair> theirSkipped, Vector<SessionStructure.Pair> theirLate) {
     Vector<SessionStructure.Pair> ourSkipped = new Vector<>(sessionStructure.getOurSkippedList());
+    Vector<SessionStructure.Pair> ourLate = new Vector<>(sessionStructure.getLateMessagesList());
     Pair<Integer, Integer> upperBound = new Pair<>(0,0);
+
+    Vector<Pair<Integer, Integer> > allLate = new Vector<>();
+    for(SessionStructure.Pair p: ourLate) {
+      allLate.add(new Pair<>(p.getI(), p.getJ()));
+    }
+    for(SessionStructure.Pair p: theirLate) {
+      allLate.add(new Pair<>(p.getI(), p.getJ()));
+    }
+    Collections.sort(allLate,
+      (Pair<Integer, Integer> p1, Pair<Integer, Integer> p2)->
+      (p1.first() == p2.first() ? p1.second() - p2.second() : p1.first() - p2.first()));
 
     upperBound = getStep() == 0 ?
     new Pair<>(theirSkipped.lastElement().getI(), theirSkipped.lastElement().getJ()) :
@@ -842,16 +891,17 @@ public class SessionState {
     // Old hash
     digest.update(getHashAuth().toByteArray());
 
+    for(Pair<Integer, Integer> p: allLate) {
+      digest.update(sessionStructure.getCtxtHashes(p.first()).getValues(p.second()).toByteArray());
+    }
+    this.sessionStructure = sessionStructure.toBuilder().clearLateMessages().build();
+
     int i = getLastAuth().first();
     int j = getLastAuth().second();
     for(Pair<Integer, Integer> p: allSkipped) {
       if(p.first() < i)
         continue;
       if(i < p.first()) {
-        // Remove all hashes from this epoch
-        this.sessionStructure = sessionStructure.toBuilder()
-                                                .setCtxtHashes(i, SessionStructure.Vector.newBuilder().build())
-                                                .build();
         i = p.first();
         j = 0;
       }
@@ -867,6 +917,7 @@ public class SessionState {
     setNAuth(nAuth+1);
     setHashAuth(newHash);
     setLastAuth(i, j);
+    clearOldEpochs();
   }
 
   private void endAuth() {

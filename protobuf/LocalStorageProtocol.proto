@@ -88,6 +88,8 @@ message SessionStructure {
     optional uint32 step = 21;
     repeated Vector currentSkipped = 22;
     repeated Pair ourSkipped = 23;
+    repeated Pair lateMessages = 24;
+    optional uint32 oldestSession = 25;
 }
 
 message RecordStructure {
