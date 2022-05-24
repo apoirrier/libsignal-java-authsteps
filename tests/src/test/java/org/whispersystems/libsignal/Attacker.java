@@ -23,6 +23,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
+import static org.whispersystems.libsignal.protocol.AuthStepProtos.AuthSet;
+
 public class Attacker {
     private SessionState sessionState;
 
@@ -37,7 +39,25 @@ public class Attacker {
       int           previousCounter = sessionState.getPreviousCounter();
       int           sessionVersion  = sessionState.getSessionVersion();
 
-      byte[]            ciphertextBody    = getCiphertext(messageKeys, paddedMessage);
+      AuthSet authInfo = AuthSet.newBuilder()
+                                .setStep(0)
+                                .build();
+      ByteArrayOutputStream augmentedPtxt = new ByteArrayOutputStream();
+      byte[] authInfoBytes = authInfo.toByteArray();
+      byte[] length = ByteBuffer.allocate(4)
+                                .order(ByteOrder.LITTLE_ENDIAN)
+                                .putInt(authInfoBytes.length)
+                                .array();
+      
+      try {
+        augmentedPtxt.write(length);
+        augmentedPtxt.write(authInfoBytes);
+        augmentedPtxt.write(paddedMessage);
+      } catch(IOException e) {
+        Log.w("SessionRecordV2", e);
+      }
+
+      byte[]            ciphertextBody    = getCiphertext(messageKeys, augmentedPtxt.toByteArray());
       CiphertextMessage ciphertextMessage = new SignalMessage(sessionVersion, messageKeys.getMacKey(),
                                                               senderEphemeral, chainKey.getIndex(),
                                                               previousCounter, ciphertextBody,

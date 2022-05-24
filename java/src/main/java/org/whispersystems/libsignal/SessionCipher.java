@@ -54,9 +54,9 @@ public class SessionCipher {
   public static final Object SESSION_LOCK = new Object();
 
   protected final SessionStore          sessionStore;
-  private final IdentityKeyStore      identityKeyStore;
-  private final SessionBuilder        sessionBuilder;
-  private final PreKeyStore           preKeyStore;
+  protected final IdentityKeyStore      identityKeyStore;
+  protected final SessionBuilder        sessionBuilder;
+  protected final PreKeyStore           preKeyStore;
   protected final SignalProtocolAddress remoteAddress;
 
   /**
@@ -291,7 +291,7 @@ public class SessionCipher {
     }
   }
 
-  private byte[] decrypt(SessionState sessionState, SignalMessage ciphertextMessage)
+  protected byte[] decrypt(SessionState sessionState, SignalMessage ciphertextMessage)
       throws InvalidMessageException, DuplicateMessageException, LegacyMessageException
   {
     if (!sessionState.hasSenderChain()) {
@@ -392,7 +392,7 @@ public class SessionCipher {
     return chainKey.getMessageKeys();
   }
 
-  private byte[] getCiphertext(MessageKeys messageKeys, byte[] plaintext) {
+  protected byte[] getCiphertext(MessageKeys messageKeys, byte[] plaintext) {
     try {
       Cipher cipher = getCipher(Cipher.ENCRYPT_MODE, messageKeys.getCipherKey(), messageKeys.getIv());
       return cipher.doFinal(plaintext);

@@ -10,6 +10,10 @@ public class TestInMemorySignalProtocolStore extends InMemorySignalProtocolStore
     super(generateIdentityKeyPair(), generateRegistrationId());
   }
 
+  public TestInMemorySignalProtocolStore(IdentityKeyPair keyPair) {
+    super(keyPair, generateRegistrationId());
+  }
+
   private static IdentityKeyPair generateIdentityKeyPair() {
     ECKeyPair identityKeyPairKeys = Curve.generateKeyPair();
 

@@ -217,8 +217,8 @@ public class AuthStepTest extends TestCase {
     RatchetingSession.initializeSession(aliceSessionState, aliceParameters);
     RatchetingSession.initializeSession(bobSessionState, bobParameters);
   
-    SignalProtocolStore aliceStore = new TestInMemorySignalProtocolStore();
-    SignalProtocolStore bobStore   = new TestInMemorySignalProtocolStore();
+    SignalProtocolStore aliceStore = new TestInMemorySignalProtocolStore(aliceIdentityKey);
+    SignalProtocolStore bobStore   = new TestInMemorySignalProtocolStore(bobIdentityKey);
 
     aliceStore.storeSession(new SignalProtocolAddress("+14159999999", 1), aliceSessionRecord);
     bobStore.storeSession(new SignalProtocolAddress("+14158888888", 1), bobSessionRecord);

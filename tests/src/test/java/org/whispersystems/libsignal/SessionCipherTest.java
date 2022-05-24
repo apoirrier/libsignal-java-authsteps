@@ -49,8 +49,8 @@ public class SessionCipherTest extends TestCase {
     aliceStore.storeSession(new SignalProtocolAddress("+14159999999", 1), aliceSessionRecord);
     bobStore.storeSession(new SignalProtocolAddress("+14158888888", 1), bobSessionRecord);
 
-    SessionCipher     aliceCipher    = new SessionCipher(aliceStore, new SignalProtocolAddress("+14159999999", 1));
-    SessionCipher     bobCipher      = new SessionCipher(bobStore, new SignalProtocolAddress("+14158888888", 1));
+    SessionCipherAuthStep     aliceCipher    = new SessionCipherAuthStep(aliceStore, new SignalProtocolAddress("+14159999999", 1));
+    SessionCipherAuthStep     bobCipher      = new SessionCipherAuthStep(bobStore, new SignalProtocolAddress("+14158888888", 1));
 
     List<CiphertextMessage> inflight = new LinkedList<>();
 
@@ -77,8 +77,8 @@ public class SessionCipherTest extends TestCase {
     aliceStore.storeSession(new SignalProtocolAddress("+14159999999", 1), aliceSessionRecord);
     bobStore.storeSession(new SignalProtocolAddress("+14158888888", 1), bobSessionRecord);
 
-    SessionCipher     aliceCipher    = new SessionCipher(aliceStore, new SignalProtocolAddress("+14159999999", 1));
-    SessionCipher     bobCipher      = new SessionCipher(bobStore, new SignalProtocolAddress("+14158888888", 1));
+    SessionCipherAuthStep     aliceCipher    = new SessionCipherAuthStep(aliceStore, new SignalProtocolAddress("+14159999999", 1));
+    SessionCipherAuthStep     bobCipher      = new SessionCipherAuthStep(bobStore, new SignalProtocolAddress("+14158888888", 1));
 
     byte[]            alicePlaintext = "This is a plaintext message.".getBytes();
     CiphertextMessage message        = aliceCipher.encrypt(alicePlaintext);

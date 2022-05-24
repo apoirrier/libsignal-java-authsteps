@@ -1,0 +1,15 @@
+syntax = "proto2";
+
+package textsecure;
+
+option java_package         = "org.whispersystems.libsignal.protocol";
+option java_outer_classname = "AuthStepProtos";
+
+import "LocalStorageProtocol.proto";
+
+message AuthSet {
+    optional uint32                    step    = 1;
+    repeated SessionStructure.Pair     skipped = 2;
+    optional SessionStructure.HashAuth hash    = 3;
+    optional bytes                     sign    = 4;
+}

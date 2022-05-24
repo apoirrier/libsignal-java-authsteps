@@ -66,8 +66,8 @@ public class SessionBuilderTest extends TestCase {
     assertTrue(aliceStore.loadSession(BOB_ADDRESS).getSessionState().getSessionVersion() == 3);
 
     final String            originalMessage    = "L'homme est condamné à être libre";
-          SessionCipher     aliceSessionCipher = new SessionCipher(aliceStore, BOB_ADDRESS);
-          CiphertextMessage outgoingMessage    = aliceSessionCipher.encrypt(originalMessage.getBytes());
+          SessionCipherAuthStep     aliceSessionCipherAuthStep = new SessionCipherAuthStep(aliceStore, BOB_ADDRESS);
+          CiphertextMessage outgoingMessage    = aliceSessionCipherAuthStep.encrypt(originalMessage.getBytes());
 
     assertTrue(outgoingMessage.getType() == CiphertextMessage.PREKEY_TYPE);
 
@@ -75,8 +75,8 @@ public class SessionBuilderTest extends TestCase {
     bobStore.storePreKey(31337, new PreKeyRecord(bobPreKey.getPreKeyId(), bobPreKeyPair));
     bobStore.storeSignedPreKey(22, new SignedPreKeyRecord(22, System.currentTimeMillis(), bobSignedPreKeyPair, bobSignedPreKeySignature));
 
-    SessionCipher bobSessionCipher = new SessionCipher(bobStore, ALICE_ADDRESS);
-    byte[] plaintext = bobSessionCipher.decrypt(incomingMessage, new DecryptionCallback() {
+    SessionCipherAuthStep bobSessionCipherAuthStep = new SessionCipherAuthStep(bobStore, ALICE_ADDRESS);
+    byte[] plaintext = bobSessionCipherAuthStep.decrypt(incomingMessage, new DecryptionCallback() {
       @Override
       public void handlePlaintext(byte[] plaintext) {
         assertTrue(originalMessage.equals(new String(plaintext)));
@@ -89,17 +89,17 @@ public class SessionBuilderTest extends TestCase {
     assertTrue(bobStore.loadSession(ALICE_ADDRESS).getSessionState().getAliceBaseKey() != null);
     assertTrue(originalMessage.equals(new String(plaintext)));
 
-    CiphertextMessage bobOutgoingMessage = bobSessionCipher.encrypt(originalMessage.getBytes());
+    CiphertextMessage bobOutgoingMessage = bobSessionCipherAuthStep.encrypt(originalMessage.getBytes());
     assertTrue(bobOutgoingMessage.getType() == CiphertextMessage.WHISPER_TYPE);
 
-    byte[] alicePlaintext = aliceSessionCipher.decrypt(new SignalMessage(bobOutgoingMessage.serialize()));
+    byte[] alicePlaintext = aliceSessionCipherAuthStep.decrypt(new SignalMessage(bobOutgoingMessage.serialize()));
     assertTrue(new String(alicePlaintext).equals(originalMessage));
 
     runInteraction(aliceStore, bobStore);
 
     aliceStore          = new TestInMemorySignalProtocolStore();
     aliceSessionBuilder = new SessionBuilder(aliceStore, BOB_ADDRESS);
-    aliceSessionCipher  = new SessionCipher(aliceStore, BOB_ADDRESS);
+    aliceSessionCipherAuthStep  = new SessionCipherAuthStep(aliceStore, BOB_ADDRESS);
 
     bobPreKeyPair            = Curve.generateKeyPair();
     bobSignedPreKeyPair      = Curve.generateKeyPair();
@@ -113,16 +113,16 @@ public class SessionBuilderTest extends TestCase {
     bobStore.storeSignedPreKey(23, new SignedPreKeyRecord(23, System.currentTimeMillis(), bobSignedPreKeyPair, bobSignedPreKeySignature));
     aliceSessionBuilder.process(bobPreKey);
 
-    outgoingMessage = aliceSessionCipher.encrypt(originalMessage.getBytes());
+    outgoingMessage = aliceSessionCipherAuthStep.encrypt(originalMessage.getBytes());
 
     try {
-      plaintext = bobSessionCipher.decrypt(new PreKeySignalMessage(outgoingMessage.serialize()));
+      plaintext = bobSessionCipherAuthStep.decrypt(new PreKeySignalMessage(outgoingMessage.serialize()));
       throw new AssertionError("shouldn't be trusted!");
     } catch (UntrustedIdentityException uie) {
       bobStore.saveIdentity(ALICE_ADDRESS, new PreKeySignalMessage(outgoingMessage.serialize()).getIdentityKey());
     }
 
-    plaintext = bobSessionCipher.decrypt(new PreKeySignalMessage(outgoingMessage.serialize()));
+    plaintext = bobSessionCipherAuthStep.decrypt(new PreKeySignalMessage(outgoingMessage.serialize()));
     assertTrue(new String(plaintext).equals(originalMessage));
 
     bobPreKey = new PreKeyBundle(bobStore.getLocalRegistrationId(), 1,
@@ -227,34 +227,34 @@ public class SessionBuilderTest extends TestCase {
     aliceSessionBuilder.process(bobPreKey);
 
     String            originalMessage    = "L'homme est condamné à être libre";
-    SessionCipher     aliceSessionCipher = new SessionCipher(aliceStore, BOB_ADDRESS);
-    CiphertextMessage outgoingMessageOne = aliceSessionCipher.encrypt(originalMessage.getBytes());
-    CiphertextMessage outgoingMessageTwo = aliceSessionCipher.encrypt(originalMessage.getBytes());
+    SessionCipherAuthStep     aliceSessionCipherAuthStep = new SessionCipherAuthStep(aliceStore, BOB_ADDRESS);
+    CiphertextMessage outgoingMessageOne = aliceSessionCipherAuthStep.encrypt(originalMessage.getBytes());
+    CiphertextMessage outgoingMessageTwo = aliceSessionCipherAuthStep.encrypt(originalMessage.getBytes());
 
     assertTrue(outgoingMessageOne.getType() == CiphertextMessage.PREKEY_TYPE);
     assertTrue(outgoingMessageTwo.getType() == CiphertextMessage.PREKEY_TYPE);
 
     PreKeySignalMessage incomingMessage = new PreKeySignalMessage(outgoingMessageOne.serialize());
 
-    SessionCipher bobSessionCipher = new SessionCipher(bobStore, ALICE_ADDRESS);
+    SessionCipherAuthStep bobSessionCipherAuthStep = new SessionCipherAuthStep(bobStore, ALICE_ADDRESS);
 
-    byte[]        plaintext        = bobSessionCipher.decrypt(incomingMessage);
+    byte[]        plaintext        = bobSessionCipherAuthStep.decrypt(incomingMessage);
     assertTrue(originalMessage.equals(new String(plaintext)));
 
-    CiphertextMessage bobOutgoingMessage = bobSessionCipher.encrypt(originalMessage.getBytes());
+    CiphertextMessage bobOutgoingMessage = bobSessionCipherAuthStep.encrypt(originalMessage.getBytes());
 
-    byte[] alicePlaintext = aliceSessionCipher.decrypt(new SignalMessage(bobOutgoingMessage.serialize()));
+    byte[] alicePlaintext = aliceSessionCipherAuthStep.decrypt(new SignalMessage(bobOutgoingMessage.serialize()));
     assertTrue(originalMessage.equals(new String(alicePlaintext)));
 
     // The test
 
     PreKeySignalMessage incomingMessageTwo = new PreKeySignalMessage(outgoingMessageTwo.serialize());
 
-    plaintext = bobSessionCipher.decrypt(new PreKeySignalMessage(incomingMessageTwo.serialize()));
+    plaintext = bobSessionCipherAuthStep.decrypt(new PreKeySignalMessage(incomingMessageTwo.serialize()));
     assertTrue(originalMessage.equals(new String(plaintext)));
 
-    bobOutgoingMessage = bobSessionCipher.encrypt(originalMessage.getBytes());
-    alicePlaintext = aliceSessionCipher.decrypt(new SignalMessage(bobOutgoingMessage.serialize()));
+    bobOutgoingMessage = bobSessionCipherAuthStep.encrypt(originalMessage.getBytes());
+    alicePlaintext = aliceSessionCipherAuthStep.decrypt(new SignalMessage(bobOutgoingMessage.serialize()));
     assertTrue(originalMessage.equals(new String(alicePlaintext)));
 
   }
@@ -281,8 +281,8 @@ public class SessionBuilderTest extends TestCase {
     aliceSessionBuilder.process(bobPreKey);
 
     String            originalMessage    = "L'homme est condamné à être libre";
-    SessionCipher     aliceSessionCipher = new SessionCipher(aliceStore, BOB_ADDRESS);
-    CiphertextMessage outgoingMessageOne = aliceSessionCipher.encrypt(originalMessage.getBytes());
+    SessionCipherAuthStep     aliceSessionCipherAuthStep = new SessionCipherAuthStep(aliceStore, BOB_ADDRESS);
+    CiphertextMessage outgoingMessageOne = aliceSessionCipherAuthStep.encrypt(originalMessage.getBytes());
 
     assertTrue(outgoingMessageOne.getType() == CiphertextMessage.PREKEY_TYPE);
 
@@ -293,12 +293,12 @@ public class SessionBuilderTest extends TestCase {
     badMessage[badMessage.length-10] ^= 0x01;
 
     PreKeySignalMessage incomingMessage  = new PreKeySignalMessage(badMessage);
-    SessionCipher        bobSessionCipher = new SessionCipher(bobStore, ALICE_ADDRESS);
+    SessionCipherAuthStep        bobSessionCipherAuthStep = new SessionCipherAuthStep(bobStore, ALICE_ADDRESS);
 
     byte[] plaintext = new byte[0];
 
     try {
-      plaintext = bobSessionCipher.decrypt(incomingMessage);
+      plaintext = bobSessionCipherAuthStep.decrypt(incomingMessage);
       throw new AssertionError("Decrypt should have failed!");
     } catch (InvalidMessageException e) {
       // good.
@@ -306,7 +306,7 @@ public class SessionBuilderTest extends TestCase {
 
     assertTrue(bobStore.containsPreKey(31337));
 
-    plaintext = bobSessionCipher.decrypt(new PreKeySignalMessage(goodMessage));
+    plaintext = bobSessionCipherAuthStep.decrypt(new PreKeySignalMessage(goodMessage));
 
     assertTrue(originalMessage.equals(new String(plaintext)));
     assertTrue(!bobStore.containsPreKey(31337));
@@ -335,8 +335,8 @@ public class SessionBuilderTest extends TestCase {
     assertTrue(aliceStore.loadSession(BOB_ADDRESS).getSessionState().getSessionVersion() == 3);
 
     String            originalMessage    = "L'homme est condamné à être libre";
-    SessionCipher     aliceSessionCipher = new SessionCipher(aliceStore, BOB_ADDRESS);
-    CiphertextMessage outgoingMessage    = aliceSessionCipher.encrypt(originalMessage.getBytes());
+    SessionCipherAuthStep     aliceSessionCipherAuthStep = new SessionCipherAuthStep(aliceStore, BOB_ADDRESS);
+    CiphertextMessage outgoingMessage    = aliceSessionCipherAuthStep.encrypt(originalMessage.getBytes());
 
     assertTrue(outgoingMessage.getType() == CiphertextMessage.PREKEY_TYPE);
 
@@ -346,8 +346,8 @@ public class SessionBuilderTest extends TestCase {
     bobStore.storePreKey(31337, new PreKeyRecord(bobPreKey.getPreKeyId(), bobPreKeyPair));
     bobStore.storeSignedPreKey(22, new SignedPreKeyRecord(22, System.currentTimeMillis(), bobSignedPreKeyPair, bobSignedPreKeySignature));
 
-    SessionCipher bobSessionCipher = new SessionCipher(bobStore, ALICE_ADDRESS);
-    byte[]        plaintext        = bobSessionCipher.decrypt(incomingMessage);
+    SessionCipherAuthStep bobSessionCipherAuthStep = new SessionCipherAuthStep(bobStore, ALICE_ADDRESS);
+    byte[]        plaintext        = bobSessionCipherAuthStep.decrypt(incomingMessage);
 
     assertTrue(bobStore.containsSession(ALICE_ADDRESS));
     assertTrue(bobStore.loadSession(ALICE_ADDRESS).getSessionState().getSessionVersion() == 3);
@@ -359,31 +359,31 @@ public class SessionBuilderTest extends TestCase {
   private void runInteraction(SignalProtocolStore aliceStore, SignalProtocolStore bobStore)
       throws DuplicateMessageException, LegacyMessageException, InvalidMessageException, NoSessionException, UntrustedIdentityException
   {
-    SessionCipher aliceSessionCipher = new SessionCipher(aliceStore, BOB_ADDRESS);
-    SessionCipher bobSessionCipher   = new SessionCipher(bobStore, ALICE_ADDRESS);
+    SessionCipherAuthStep aliceSessionCipherAuthStep = new SessionCipherAuthStep(aliceStore, BOB_ADDRESS);
+    SessionCipherAuthStep bobSessionCipherAuthStep   = new SessionCipherAuthStep(bobStore, ALICE_ADDRESS);
 
     String originalMessage = "smert ze smert";
-    CiphertextMessage aliceMessage = aliceSessionCipher.encrypt(originalMessage.getBytes());
+    CiphertextMessage aliceMessage = aliceSessionCipherAuthStep.encrypt(originalMessage.getBytes());
 
     assertTrue(aliceMessage.getType() == CiphertextMessage.WHISPER_TYPE);
 
-    byte[] plaintext = bobSessionCipher.decrypt(new SignalMessage(aliceMessage.serialize()));
+    byte[] plaintext = bobSessionCipherAuthStep.decrypt(new SignalMessage(aliceMessage.serialize()));
     assertTrue(new String(plaintext).equals(originalMessage));
 
-    CiphertextMessage bobMessage = bobSessionCipher.encrypt(originalMessage.getBytes());
+    CiphertextMessage bobMessage = bobSessionCipherAuthStep.encrypt(originalMessage.getBytes());
 
     assertTrue(bobMessage.getType() == CiphertextMessage.WHISPER_TYPE);
 
-    plaintext = aliceSessionCipher.decrypt(new SignalMessage(bobMessage.serialize()));
+    plaintext = aliceSessionCipherAuthStep.decrypt(new SignalMessage(bobMessage.serialize()));
     assertTrue(new String(plaintext).equals(originalMessage));
 
     for (int i=0;i<10;i++) {
       String loopingMessage = ("What do we mean by saying that existence precedes essence? " +
                                "We mean that man first of all exists, encounters himself, " +
                                "surges up in the world--and defines himself aftward. " + i);
-      CiphertextMessage aliceLoopingMessage = aliceSessionCipher.encrypt(loopingMessage.getBytes());
+      CiphertextMessage aliceLoopingMessage = aliceSessionCipherAuthStep.encrypt(loopingMessage.getBytes());
 
-      byte[] loopingPlaintext = bobSessionCipher.decrypt(new SignalMessage(aliceLoopingMessage.serialize()));
+      byte[] loopingPlaintext = bobSessionCipherAuthStep.decrypt(new SignalMessage(aliceLoopingMessage.serialize()));
       assertTrue(new String(loopingPlaintext).equals(loopingMessage));
     }
 
@@ -391,9 +391,9 @@ public class SessionBuilderTest extends TestCase {
       String loopingMessage = ("What do we mean by saying that existence precedes essence? " +
                                "We mean that man first of all exists, encounters himself, " +
                                "surges up in the world--and defines himself aftward. " + i);
-      CiphertextMessage bobLoopingMessage = bobSessionCipher.encrypt(loopingMessage.getBytes());
+      CiphertextMessage bobLoopingMessage = bobSessionCipherAuthStep.encrypt(loopingMessage.getBytes());
 
-      byte[] loopingPlaintext = aliceSessionCipher.decrypt(new SignalMessage(bobLoopingMessage.serialize()));
+      byte[] loopingPlaintext = aliceSessionCipherAuthStep.decrypt(new SignalMessage(bobLoopingMessage.serialize()));
       assertTrue(new String(loopingPlaintext).equals(loopingMessage));
     }
 
@@ -403,7 +403,7 @@ public class SessionBuilderTest extends TestCase {
       String loopingMessage = ("What do we mean by saying that existence precedes essence? " +
                                "We mean that man first of all exists, encounters himself, " +
                                "surges up in the world--and defines himself aftward. " + i);
-      CiphertextMessage aliceLoopingMessage = aliceSessionCipher.encrypt(loopingMessage.getBytes());
+      CiphertextMessage aliceLoopingMessage = aliceSessionCipherAuthStep.encrypt(loopingMessage.getBytes());
 
       aliceOutOfOrderMessages.add(new Pair<>(loopingMessage, aliceLoopingMessage));
     }
@@ -412,22 +412,22 @@ public class SessionBuilderTest extends TestCase {
       String loopingMessage = ("What do we mean by saying that existence precedes essence? " +
                                "We mean that man first of all exists, encounters himself, " +
                                "surges up in the world--and defines himself aftward. " + i);
-      CiphertextMessage aliceLoopingMessage = aliceSessionCipher.encrypt(loopingMessage.getBytes());
+      CiphertextMessage aliceLoopingMessage = aliceSessionCipherAuthStep.encrypt(loopingMessage.getBytes());
 
-      byte[] loopingPlaintext = bobSessionCipher.decrypt(new SignalMessage(aliceLoopingMessage.serialize()));
+      byte[] loopingPlaintext = bobSessionCipherAuthStep.decrypt(new SignalMessage(aliceLoopingMessage.serialize()));
       assertTrue(new String(loopingPlaintext).equals(loopingMessage));
     }
 
     for (int i=0;i<10;i++) {
       String loopingMessage = ("You can only desire based on what you know: " + i);
-      CiphertextMessage bobLoopingMessage = bobSessionCipher.encrypt(loopingMessage.getBytes());
+      CiphertextMessage bobLoopingMessage = bobSessionCipherAuthStep.encrypt(loopingMessage.getBytes());
 
-      byte[] loopingPlaintext = aliceSessionCipher.decrypt(new SignalMessage(bobLoopingMessage.serialize()));
+      byte[] loopingPlaintext = aliceSessionCipherAuthStep.decrypt(new SignalMessage(bobLoopingMessage.serialize()));
       assertTrue(new String(loopingPlaintext).equals(loopingMessage));
     }
 
     for (Pair<String, CiphertextMessage> aliceOutOfOrderMessage : aliceOutOfOrderMessages) {
-      byte[] outOfOrderPlaintext = bobSessionCipher.decrypt(new SignalMessage(aliceOutOfOrderMessage.second().serialize()));
+      byte[] outOfOrderPlaintext = bobSessionCipherAuthStep.decrypt(new SignalMessage(aliceOutOfOrderMessage.second().serialize()));
       assertTrue(new String(outOfOrderPlaintext).equals(aliceOutOfOrderMessage.first()));
     }
   }

@@ -43,6 +43,21 @@ message SessionStructure {
         optional bytes  baseKey        = 2;
     }
 
+    message Vector {
+        repeated bytes values = 1;
+        repeated int32 intValues = 2;
+    }
+
+    message Pair {
+        optional uint32 i = 1;
+        optional uint32 j = 2;
+    }
+
+    message HashAuth {
+        optional uint32 n = 1;
+        optional bytes hash = 2;
+    }
+
     optional uint32 sessionVersion      = 1;
     optional bytes localIdentityPublic  = 2;
     optional bytes remoteIdentityPublic = 3;
@@ -61,6 +76,18 @@ message SessionStructure {
 
     optional bool needsRefresh = 12;
     optional bytes aliceBaseKey = 13;
+
+    repeated Vector ctxtHashes = 14;
+    repeated int32 ratchetHashes = 15;
+    optional HashAuth hashAuth = 16;
+    optional Pair lastAuth = 17;
+    optional bool changedEpoch = 18;
+    optional uint32 nAuth = 19;
+
+    optional bool authInProgress = 20;
+    optional uint32 step = 21;
+    repeated Vector currentSkipped = 22;
+    repeated Pair ourSkipped = 23;
 }
 
 message RecordStructure {
