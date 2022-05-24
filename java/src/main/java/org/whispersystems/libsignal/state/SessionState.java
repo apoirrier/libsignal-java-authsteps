@@ -818,12 +818,13 @@ public class SessionState {
       int authInfoStep = authInfo.hasStep() ? authInfo.getStep() : 0;
       IdentityKey vfyKey = getRemoteIdentityKey();
 
+      if(ctxtEpoch < currentEpoch || (auth && !changedEpoch) || (!hasInfo && currentStep != 3))
+        return;
+
       if((auth && currentStep < 3 && ctxtEpoch >= currentEpoch - currentStep && !hasInfo) ||
         ((currentEpoch + 1) % authStepPeriod == 0 && !hasInfo))
         throw new InvalidMessageException("No authentication information found");
 
-      if(ctxtEpoch < currentEpoch || (auth && !changedEpoch) || (!hasInfo && currentStep != 3))
-        return;
       setChangedEpoch(false);
 
       if(authInfoStep == 1 && !auth) {
@@ -943,6 +944,10 @@ public class SessionState {
 
   public byte[] getFingerprint() {
     return getHashAuth().toByteArray();
+  }
+
+  public int size() {
+    return sessionStructure.toByteArray().length;
   }
 
   @Override

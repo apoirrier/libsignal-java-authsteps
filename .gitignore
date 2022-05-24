@@ -5,3 +5,7 @@ build
 .idea
 gradle.properties
 local.properties
+*/.classpath
+*/.project
+*/.settings
+*/bin

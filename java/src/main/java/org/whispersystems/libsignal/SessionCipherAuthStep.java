@@ -167,4 +167,12 @@ public class SessionCipherAuthStep extends SessionCipher{
   public IdentityKeyPair leakIdentity() {
     return identityKeyStore.getIdentityKeyPair();
   }
+
+  public int size() {
+    synchronized (SESSION_LOCK) {
+      SessionRecord sessionRecord   = sessionStore.loadSession(remoteAddress);
+      SessionState  sessionState    = sessionRecord.getSessionState();
+      return sessionState.size();
+    }
+  }
 }

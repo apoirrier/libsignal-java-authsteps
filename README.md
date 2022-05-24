@@ -53,3 +53,13 @@ The following table lists the results of those tests:
 
 ![](docs/test_results.png)
 
+## Benchmarking
+
+To launch benchmarking tests, use:
+
+```
+./ gradlew clean test -- tests BenchmarkingTest
+```
+
+Then graphs can be drawn using the `graph.py` file.
+

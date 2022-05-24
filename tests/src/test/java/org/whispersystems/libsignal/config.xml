@@ -1,0 +1,13 @@
+<config>
+    <startNb>3</startNb>
+    <endNb>3</endNb>
+    <startDrop>90</startDrop>
+    <endDrop>90</endDrop>
+    <maxMessages>10000</maxMessages>
+    <average>false</average>
+    <outFile>outputAuthStep.log</outFile>
+    <seeds>
+        <seed>70496</seed>
+        <seed>80221</seed>
+    </seeds>
+</config>
