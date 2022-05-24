@@ -127,6 +127,26 @@ public class SessionCipherAuthStep extends SessionCipher{
     return realPtxt;
   }
 
+  /**
+   * Produces a fingerprint for the out-of-band detection procedure
+   */
+  public byte[] produceFingerprint() {
+    synchronized (SESSION_LOCK) {
+      SessionRecord sessionRecord   = sessionStore.loadSession(remoteAddress);
+      SessionState  sessionState    = sessionRecord.getSessionState();
+      return sessionState.getFingerprint();
+    }
+  }
+
+  /**
+   * Checks if the provided fingerprint matches
+   */
+  public void checkFingerprint(byte[] other) throws OutOfBandCheckException {
+    byte[] myFingerprint = produceFingerprint();
+    if(!Arrays.equals(myFingerprint, other))
+      throw new OutOfBandCheckException();
+  }
+
     /**
    * Leaks a party state
    * 
@@ -136,7 +156,15 @@ public class SessionCipherAuthStep extends SessionCipher{
     synchronized (SESSION_LOCK) {
       SessionRecord sessionRecord   = sessionStore.loadSession(remoteAddress);
       SessionState  sessionState    = sessionRecord.getSessionState();
-      return new SessionState(sessionState);
+      return sessionState;
     }
+  }
+
+  public SignalProtocolAddress leakAddress() {
+    return remoteAddress;
+  }
+
+  public IdentityKeyPair leakIdentity() {
+    return identityKeyStore.getIdentityKeyPair();
   }
 }

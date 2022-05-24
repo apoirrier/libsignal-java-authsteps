@@ -49,12 +49,13 @@ public class AuthStepTest extends TestCase {
      * - messages arrive out-of-order (all in one epoch)
      */
   public void testNoAdvOneAuth()
-      throws InvalidKeyException, DuplicateMessageException,
+      throws InvalidKeyException, DuplicateMessageException, OutOfBandCheckException, AuthStepSignatureException,
       LegacyMessageException, InvalidMessageException, NoSuchAlgorithmException, NoSessionException, UntrustedIdentityException
   {
     Pair<SessionCipherAuthStep, SessionCipherAuthStep> ciphers = initializeSessionsV3();
 
     runOneAuthStep(ciphers.first(), ciphers.second(), AttackerType.NONE);
+    outOfBandCheck(ciphers.first(), ciphers.second());
   }
 
   /**
@@ -97,12 +98,13 @@ public class AuthStepTest extends TestCase {
    * This test involves two authentication steps.
    */
   public void testNoAdvTwoAuth()
-      throws InvalidKeyException, DuplicateMessageException,
+      throws InvalidKeyException, DuplicateMessageException, OutOfBandCheckException, AuthStepSignatureException,
       LegacyMessageException, InvalidMessageException, NoSuchAlgorithmException, NoSessionException, UntrustedIdentityException
   {
     Pair<SessionCipherAuthStep, SessionCipherAuthStep> ciphers = initializeSessionsV3();
 
     runTwoAuthStep(ciphers.first(), ciphers.second(), AttackerType.NONE);
+    outOfBandCheck(ciphers.first(), ciphers.second());
   }
 
   /**
@@ -145,12 +147,13 @@ public class AuthStepTest extends TestCase {
    * Soundness test with many epochs
    */
   public void testManyEpochs()
-      throws InvalidKeyException, DuplicateMessageException,
+      throws InvalidKeyException, DuplicateMessageException, OutOfBandCheckException, AuthStepSignatureException,
       LegacyMessageException, InvalidMessageException, NoSuchAlgorithmException, NoSessionException, UntrustedIdentityException
   {
     Pair<SessionCipherAuthStep, SessionCipherAuthStep> ciphers = initializeSessionsV3();
 
     runManyEpochs(ciphers.first(), ciphers.second());
+    outOfBandCheck(ciphers.first(), ciphers.second());
   }
 
   /**
@@ -170,6 +173,64 @@ public class AuthStepTest extends TestCase {
       // So if we're here this is good.
     }
   }
+
+  /**
+   * Test the out of band detection with an adversary knowing long-term secrets
+   */
+  public void testOutOfBand()
+  throws InvalidKeyException, DuplicateMessageException, AuthStepSignatureException,
+      LegacyMessageException, InvalidMessageException, NoSuchAlgorithmException, NoSessionException, UntrustedIdentityException {
+    Pair<SessionCipherAuthStep, SessionCipherAuthStep> ciphers = initializeSessionsV3();
+    runOneAuthStep(ciphers.first(), ciphers.second(), AttackerType.NONE);
+
+    Attacker eveImpersonatingAlice = new Attacker(ciphers.first(), true);
+    Attacker eveImpersonatingBob = new Attacker(ciphers.second(), true);
+
+    // Let's assume Alice wants to send a message to Bob
+    // Now that Eve is MitM, she changes it
+    byte[]            ptxtAlice      = "Let's have some ice cream".getBytes();
+    CiphertextMessage ctxtAlice      = ciphers.first().encrypt(ptxtAlice);
+    byte[]            ptxtEveB       = eveImpersonatingBob.decrypt(new SignalMessage(ctxtAlice.serialize()));
+    assertTrue(Arrays.equals(ptxtAlice, ptxtEveB));
+
+    byte[]            ptxtEveA       = "Let's kill the president".getBytes();
+    CiphertextMessage ctxtEveA       = eveImpersonatingAlice.encrypt(ptxtEveA);
+    byte[]            ptxtBob        = ciphers.second().decrypt(new SignalMessage(ctxtEveA.serialize()));
+    assertTrue(Arrays.equals(ptxtEveA, ptxtBob));
+
+    // Continue conversation on both sides, enough to get past auth step
+    for(int i=0;i<7;++i) {
+      // Alice to Eve and Eve to Bob
+      byte[]            ptxtA        = "Hello there".getBytes();
+      CiphertextMessage ctxtA        = ciphers.first().encrypt(ptxtA);
+      byte[]            ptxtEB       = eveImpersonatingBob.decrypt(new SignalMessage(ctxtA.serialize()));
+      assertTrue(Arrays.equals(ptxtA, ptxtEB));
+
+      byte[]            ptxtEA       = "Hello there".getBytes();
+      CiphertextMessage ctxtEA       = eveImpersonatingAlice.encrypt(ptxtEA);
+      byte[]            ptxtB        = ciphers.second().decrypt(new SignalMessage(ctxtEA.serialize()));
+      assertTrue(Arrays.equals(ptxtEA, ptxtB));
+
+      // Bob to Eve and Eve to Alice
+      byte[]            ptxtB2        = "General Kenobi".getBytes();
+      CiphertextMessage ctxtB2        = ciphers.second().encrypt(ptxtB2);
+      byte[]            ptxtEA2       = eveImpersonatingAlice.decrypt(new SignalMessage(ctxtB2.serialize()));
+      assertTrue(Arrays.equals(ptxtB2, ptxtEA2));
+
+      byte[]            ptxtEB2       = "General Kenobi".getBytes();
+      CiphertextMessage ctxtEB2       = eveImpersonatingBob.encrypt(ptxtEB2);
+      byte[]            ptxt12        = ciphers.first().decrypt(new SignalMessage(ctxtEB2.serialize()));
+      assertTrue(Arrays.equals(ptxtEB2, ptxt12));
+    }
+
+    try {
+      outOfBandCheck(ciphers.first(), ciphers.second());
+      throw new AssertionError("Out-of-band verification should fail!");
+    } catch (OutOfBandCheckException e) {
+      // We're good, the adversary has been detected
+    }
+  }
+
 
   private Pair<SessionCipherAuthStep, SessionCipherAuthStep> initializeSessionsV3()
       throws InvalidKeyException
@@ -591,5 +652,10 @@ public class AuthStepTest extends TestCase {
         byte[]            ptxtBobEvenb   = bobCipher.decrypt(new SignalMessage(ctxtEvenb.serialize()));
         assertTrue(Arrays.equals(ptxtAliceEvenb, ptxtBobEvenb));
       }
+  }
+
+  private void outOfBandCheck(SessionCipherAuthStep aliceCipher, SessionCipherAuthStep bobCipher) throws OutOfBandCheckException {
+    byte[] fingerprint = aliceCipher.produceFingerprint();
+    bobCipher.checkFingerprint(fingerprint);
   }
 }
